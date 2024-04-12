@@ -9,6 +9,10 @@ async function runTests() {
     await driver.manage().window().maximize();
     await driver.sleep(1000);
 
+    // Check page title
+    const title = await driver.getTitle();
+    assert.equal(title, "Sample page - lambdatest.com");
+
     let textElement = await driver.findElement(By.xpath("//span[contains(@class, 'ng-binding')]"));
     let text = await textElement.getText();
     assert.equal(text, "5 of 5 remaining");
