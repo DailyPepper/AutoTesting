@@ -8,8 +8,7 @@ async function runTests() {
     await driver.get("https://lambdatest.github.io/sample-todo-app/");
     await driver.manage().window().maximize();
     await driver.sleep(1000);
-
-    // Check page title
+    
     const title = await driver.getTitle();
     assert.equal(title, "Sample page - lambdatest.com");
 
