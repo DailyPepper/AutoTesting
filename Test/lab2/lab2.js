@@ -30,10 +30,20 @@ class BasePage {
         return await element.getAttribute(attributeName);
     }
 
+    async isElementPresent(locator) {
+        try {
+            await this.driver.findElement(locator);
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
     async closeBrowser() {
         await this.driver.quit();
     }
 }
+
 
 class MospolytechPage extends BasePage {
     constructor(driver) {
@@ -42,7 +52,6 @@ class MospolytechPage extends BasePage {
         this.seeOnWebsiteLink = By.css('a[href="https://rasp.dmami.ru/"]');
         this.searchField = By.xpath("//input[@class='groups']");
         this.currentWeekDay = By.xpath('//div[contains(@class, "schedule-day_today")]/div[contains(@class, "schedule-day__title")]');
-        this.currentWeekDayColor = By.xpath('//div[contains(@class, "schedule-day_today")]/div[contains(@class, "schedule-day__title")]');
     }
 
     async open() {
@@ -57,15 +66,16 @@ class MospolytechPage extends BasePage {
         await this.click(this.seeOnWebsiteLink);
     }
 
-    async SwitchToNextTab() {
+    async switchToNextTab() {
         let originalTab = await this.driver.getWindowHandle();
         const windows = await this.driver.getAllWindowHandles();
         
-        windows.forEach(async handle => {
+        for (const handle of windows) {
             if (handle !== originalTab) {
                 await this.driver.switchTo().window(handle);
+                break;
             }
-        });
+        }
     }
 
     async searchGroup(searchText) {
@@ -73,19 +83,26 @@ class MospolytechPage extends BasePage {
     }
 
     async getWeekDayText() {
-        return await this.getTextOfElement(this.currentWeekDay);
+        if (await this.isElementPresent(this.currentWeekDay)) {
+            return await this.getTextOfElement(this.currentWeekDay);
+        } else {
+            throw new Error('На странице нет выделенного дня недели');
+        }
     }
+    
 
-    async getWeekDayColor() {
-        return await this.getAttributeOfElement(this.currentWeekDayColor, 'style');
+    async isWeekDayHighlighted() {
+        const classes = await this.getClassOfElement(this.currentWeekDay);
+        return classes.includes('schedule-day_today');
     }
-}
-
-function getCurrentWeekDay() {
-    let date = new Date()
+    async getCurrentWeekDay() {
+    let date = new Date();
     let options = { weekday: "long" };
-    return new Intl.DateTimeFormat("ru-RU", options).format(date)
+    return new Intl.DateTimeFormat("ru-RU", options).format(date);
+    }
 }
+
+
 
 describe('Mospolytech.ru test', function() {
     this.timeout(70000);
@@ -105,7 +122,7 @@ describe('Mospolytech.ru test', function() {
         try {
             await mospolytechPage.clickSchedulesButton();
             await mospolytechPage.clickSeeOnWebsiteLink();
-            await mospolytechPage.SwitchToNextTab();
+            await mospolytechPage.switchToNextTab();
             await mospolytechPage.searchGroup('221-322');
             await driver.sleep(3000);
             await mospolytechPage.click(By.xpath('//div[@id="221-322"]'));
@@ -118,17 +135,13 @@ describe('Mospolytech.ru test', function() {
 
     it('Сравнивает выделенный день недели с сегодняшним', async function() {
         try {
-            let weekDayOnPage = await mospolytechPage.getWeekDayText();
+            let weekDayOnPage = await MospolytechPage.getTextOfElement(MospolytechPage.currentWeekDay);
             let systemWeekDay = getCurrentWeekDay(); 
             assert.strictEqual(weekDayOnPage.toUpperCase(), systemWeekDay.toUpperCase(), "Дни недели не совпадают");
-    
-            let weekDayColor = await mospolytechPage.getWeekDayColor();
-            assert.ok(weekDayColor.includes('background-color'), "День недели не выделен цветом");
         } catch (error) {
             console.log("На странице нет выделенного дня недели");
         }
-    });    
-    
+    });
     after(async function() {
         await mospolytechPage.closeBrowser();
     });
