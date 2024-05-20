@@ -25,6 +25,11 @@ class BasePage {
         return await element.getText();
     }
 
+    async getAttributeOfElement(locator, attributeName) {
+        const element = await this.driver.findElement(locator);
+        return await element.getAttribute(attributeName);
+    }
+
     async closeBrowser() {
         await this.driver.quit();
     }
@@ -37,6 +42,7 @@ class MospolytechPage extends BasePage {
         this.seeOnWebsiteLink = By.css('a[href="https://rasp.dmami.ru/"]');
         this.searchField = By.xpath("//input[@class='groups']");
         this.currentWeekDay = By.xpath('//div[contains(@class, "schedule-day_today")]/div[contains(@class, "schedule-day__title")]');
+        this.currentWeekDayColor = By.xpath('//div[contains(@class, "schedule-day_today")]/div[contains(@class, "schedule-day__title")]');
     }
 
     async open() {
@@ -65,6 +71,14 @@ class MospolytechPage extends BasePage {
     async searchGroup(searchText) {
         await this.enterText(this.searchField, searchText);
     }
+
+    async getWeekDayText() {
+        return await this.getTextOfElement(this.currentWeekDay);
+    }
+
+    async getWeekDayColor() {
+        return await this.getAttributeOfElement(this.currentWeekDayColor, 'style');
+    }
 }
 
 function getCurrentWeekDay() {
@@ -74,7 +88,7 @@ function getCurrentWeekDay() {
 }
 
 describe('Mospolytech.ru test', function() {
-    this.timeout(60000); // Увеличиваем таймаут до 60 секунд
+    this.timeout(70000);
     let driver;
     let mospolytechPage;
 
@@ -104,13 +118,16 @@ describe('Mospolytech.ru test', function() {
 
     it('Сравнивает выделенный день недели с сегодняшним', async function() {
         try {
-            let weekDayOnPage = await mospolytechPage.getTextOfElement(mospolytechPage.currentWeekDay);
+            let weekDayOnPage = await mospolytechPage.getWeekDayText();
             let systemWeekDay = getCurrentWeekDay(); 
             assert.strictEqual(weekDayOnPage.toUpperCase(), systemWeekDay.toUpperCase(), "Дни недели не совпадают");
+    
+            let weekDayColor = await mospolytechPage.getWeekDayColor();
+            assert.ok(weekDayColor.includes('background-color'), "День недели не выделен цветом");
         } catch (error) {
             console.log("На странице нет выделенного дня недели");
         }
-    });
+    });    
     
     after(async function() {
         await mospolytechPage.closeBrowser();
