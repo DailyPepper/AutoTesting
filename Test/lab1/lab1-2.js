@@ -1,55 +1,107 @@
-const assert = require('assert');
-const { Builder, By } = require('selenium-webdriver');
+const { Builder, By, until } = require('selenium-webdriver');
+const { assert } = require('chai');
 
-let driver = new Builder().forBrowser('chrome').build();
+class TodoPage {
+  constructor(driver) {
+    this.driver = driver;
+    this.BASE_URL = "https://lambdatest.github.io/sample-todo-app";
+    this.titleSelector = By.css("h2");
+    this.remainingSelector = By.className("ng-binding");
+    this.todoItemSelector = By.css("ul li");
+    this.checkboxSelector = By.css("input[type=checkbox]");
+    this.spanSelector = By.css("span");
+    this.todoTextInput = By.id("sampletodotext");
+    this.addButton = By.id("addbutton");
+  }
 
-describe('MyTestSuite', function() {
-    it('should load the sample todo app page and perform actions', function() {
-        return (async () => {
-            try {
-                await driver.get("https://lambdatest.github.io/sample-todo-app/");
-                await driver.manage().window().maximize();
-                await driver.sleep(1000);
+  async open() {
+    await this.driver.get(this.BASE_URL);
+    await this.driver.manage().window().maximize();
+    await this.driver.sleep(1000);
+  }
 
-                const title = await driver.getTitle();
-                assert.equal(title, "Sample page - lambdatest.com");
+  async getTitleText() {
+    const element = await this.driver.findElement(this.titleSelector);
+    return await element.getText();
+  }
 
-                let textElement = await driver.findElement(By.xpath("//span[contains(@class, 'ng-binding')]"));
-                let text = await textElement.getText();
-                assert.equal(text, "5 of 5 remaining");
+  async getRemainingText() {
+    const element = await this.driver.findElement(this.remainingSelector);
+    return await element.getText();
+  }
 
-                let firstListItem = await driver.findElement(By.xpath("//ul/li[1]"));
-                let firstItemClass = await firstListItem.getAttribute("class");
-                assert.equal(firstItemClass.includes("done-true"), false);
+  async findNthCheckbox(n) {
+    return await this.driver.findElement(By.css(`ul li:nth-child(${n}) input[type=checkbox]`));
+  }
 
-                await driver.findElement(By.xpath("//ul/li[1]/input")).click();
+  async clickCheckbox(checkbox) {
+    await checkbox.click();
+  }
 
-                firstItemClass = await firstListItem.getAttribute("class");
-                assert.equal(firstItemClass.includes("done-false"), false);
+  async getSpanClass(checkbox) {
+    const span = await checkbox.findElement(By.xpath("following-sibling::*[1]"));
+    return await span.getAttribute("class");
+  }
 
-                for (let i = 1; i <= 5; i++) {
-                    let listItem = await driver.findElement(By.xpath(`//ul/li[${i}]`));
-                    await driver.findElement(By.xpath(`//ul/li[${i}]/input`)).click();
-                    let itemClass = await listItem.getAttribute("class");
-                    assert.equal(itemClass.includes("done-false"), false);
-                }
+  async addNewItem(text) {
+    await this.driver.findElement(this.todoTextInput).sendKeys(text);
+    await this.driver.findElement(this.addButton).click();
+  }
+}
 
-                await driver.findElement(By.id("sampletodotext")).sendKeys("New Item");
-                await driver.findElement(By.id("addbutton")).click();
+describe('Todo Page Tests', () => {
+  let driver;
+  let page;
 
-                let newItem = await driver.findElement(By.xpath("//ul/li[6]"));
-                await newItem.click();
+  before(async () => {
+    driver = await new Builder().forBrowser('chrome').build();
+    page = new TodoPage(driver);
+    await page.open();
+  });
 
-                console.log('All steps executed successfully');
-            } catch (err) {
-                await driver.takeScreenshot().then(function (image) {
-                    require('fs').writeFileSync('screenshot_error.png', image, 'base64');
-                });
-                console.error('Error executing the test: %s', err);
-                throw err; 
-            } finally {
-                await driver.quit();
-            }
-        })();
-    });
+  after(async () => {
+    if (driver) {
+      await driver.quit();
+    }
+  });
+
+  it('should have correct page title', async () => {
+    assert.strictEqual(await page.getTitleText(), "LambdaTest Sample App");
+  });
+
+  it('should display correct remaining text', async () => {
+    assert.strictEqual(await page.getRemainingText(), "5 of 5 remaining");
+  });
+
+  it('should toggle checkboxes correctly', async () => {
+    const todoItems = await driver.findElements(page.todoItemSelector);
+    for (let todoItem of todoItems) {
+      const checkbox = await todoItem.findElement(page.checkboxSelector);
+      const spanClass = await todoItem.findElement(page.spanSelector).getAttribute("class");
+      assert.strictEqual(spanClass, "done-false");
+      await page.clickCheckbox(checkbox);
+      assert.strictEqual(await todoItem.findElement(page.spanSelector).getAttribute("class"), "done-true");
+    }
+  });
+
+  it('should add new item correctly', async () => {
+    const newItem = "Six Item";
+    console.log("Adding new item...");
+    await page.addNewItem(newItem);
+    console.log("New item added.");
+    await driver.wait(async () => {
+      const remainingText = await page.getRemainingText();
+      return remainingText === "6 of 6 remaining";
+    }, 5000, "Text of remaining tasks didn't update to '6 of 6 remaining'");
+    
+    console.log("Updated remaining text:", await page.getRemainingText());
+    const addedCheckbox = await page.findNthCheckbox(6);
+    assert.strictEqual(await addedCheckbox.getAttribute("checked"), null);
+    assert.strictEqual(await page.getSpanClass(addedCheckbox), "done-false");
+    assert.strictEqual(await page.getRemainingText(), "6 of 6 remaining");
+    await page.clickCheckbox(addedCheckbox);
+    assert.strictEqual(await addedCheckbox.getAttribute("checked"), "true");
+    assert.strictEqual(await page.getSpanClass(addedCheckbox), "done-true");
+    assert.strictEqual(await page.getRemainingText(), "5 of 6 remaining");
+  });
 });
