@@ -1,6 +1,5 @@
 const { Builder, Browser, By, until } = require('selenium-webdriver');
 const fs = require('fs');
-
 const SLEEP_TIME12 = 120000;
 const SLEEP_TIME5 = 50000;
 const SLEEP_TIME7 = 70000;
